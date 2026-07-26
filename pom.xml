@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dev.oluso</groupId>
-    <artifactId>oluso</artifactId>
+    <artifactId>oluso-parent</artifactId>
     <version>0.1.0</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <name>Oluso</name>
+    <name>Oluso Parent</name>
     <description>AI-powered error monitoring for Java applications: automatic uncaught-exception reporting, breadcrumb tracking, and intelligent error grouping.</description>
     <url>https://github.com/olusodotdev/oluso-java</url>
 
@@ -33,34 +33,18 @@
         <developerConnection>scm:git:https://github.com/olusodotdev/oluso-java.git</developerConnection>
     </scm>
 
+    <modules>
+        <module>core</module>
+        <module>spring-boot-starter</module>
+    </modules>
+
     <properties>
-        <maven.compiler.release>11</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jackson.version>2.17.2</jackson.version>
         <junit.version>5.11.0</junit.version>
         <wiremock.version>3.9.1</wiremock.version>
+        <spring-boot.version>3.5.16</spring-boot.version>
     </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.wiremock</groupId>
-            <artifactId>wiremock</artifactId>
-            <version>${wiremock.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
 
     <build>
         <plugins>
@@ -107,7 +91,9 @@
         <!--
             Only active for an actual Central release (`mvn -Prelease deploy`).
             Kept out of the default build so `mvn test`/`mvn package` don't
-            require a GPG key or Central credentials to run locally.
+            require a GPG key or Central credentials to run locally. Defined
+            once here so every module inherits it instead of repeating this
+            per module.
         -->
         <profile>
             <id>release</id>
