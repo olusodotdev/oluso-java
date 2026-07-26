@@ -11,6 +11,7 @@ import dev.oluso.internal.Transport;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -85,10 +86,30 @@ public final class OlusoClient {
      * Low-level entry point the ergonomic {@code capture*} methods above
      * are built on. Exposed directly so framework integrations built
      * outside this library can report with a specific severity/stack
-     * trace/request without losing access to any of it.
+     * trace/request without losing access to any of it. Uses the internal
+     * {@code ThreadLocal} scope for breadcrumbs/user/custom context; for a
+     * caller that maintains its own scoping instead (see {@link
+     * ScopeSnapshot}), use the overload that accepts one.
      */
     public CompletableFuture<Void> capture(
             String errorType, String message, String stackTrace, Severity severity, RequestContext request) {
+        return capture(errorType, message, stackTrace, severity, request, null);
+    }
+
+    /**
+     * Same as {@link #capture(String, String, String, Severity,
+     * RequestContext)}, but reports using {@code scopeOverride}'s
+     * breadcrumbs/user/custom context instead of pulling them from the
+     * internal {@code ThreadLocal} scope. Pass {@code null} to fall back
+     * to the default (internal-scope) behavior.
+     */
+    public CompletableFuture<Void> capture(
+            String errorType,
+            String message,
+            String stackTrace,
+            Severity severity,
+            RequestContext request,
+            ScopeSnapshot scopeOverride) {
         if (options.getShouldReport() != null && !options.getShouldReport().test(message)) {
             return CompletableFuture.completedFuture(null);
         }
@@ -104,7 +125,7 @@ public final class OlusoClient {
             System.err.println("[Oluso] " + errorType + ": " + message);
         }
 
-        ErrorContext context = buildErrorContext(request);
+        ErrorContext context = buildErrorContext(request, scopeOverride);
         String fingerprint = options.getFingerprint() != null
                 ? options.getFingerprint().apply(message, context)
                 : Fingerprint.generate(errorType, message, stackTrace);
@@ -179,11 +200,13 @@ public final class OlusoClient {
                 });
     }
 
-    private ErrorContext buildErrorContext(RequestContext request) {
-        Map<String, Object> custom = new LinkedHashMap<>(scope.getCustomContext());
+    private ErrorContext buildErrorContext(RequestContext request, ScopeSnapshot scopeOverride) {
+        Map<String, Object> custom = new LinkedHashMap<>(
+                scopeOverride != null ? scopeOverride.getCustom() : scope.getCustomContext());
+        UserContext user = scopeOverride != null ? scopeOverride.getUser() : scope.getUserContext();
+        List<Breadcrumb> breadcrumbs = scopeOverride != null ? scopeOverride.getBreadcrumbs() : scope.getBreadcrumbs();
         RequestContext sanitizedRequest = request != null ? sanitizeRequest(request) : null;
-        return new ErrorContext(
-                sanitizedRequest, scope.getUserContext(), ServerContext.capture(), custom, scope.getBreadcrumbs());
+        return new ErrorContext(sanitizedRequest, user, ServerContext.capture(), custom, breadcrumbs);
     }
 
     private RequestContext sanitizeRequest(RequestContext request) {

@@ -85,9 +85,9 @@ oluso:
 
 ## Compatibility
 
-This starter is built on a servlet `Filter` and a `HandlerExceptionResolver` -- both Spring MVC (servlet-stack) concepts. It auto-detects a servlet web application (`@ConditionalOnWebApplication(type = SERVLET)`) and won't register the filter or resolver otherwise, but it also won't do anything useful in a WebFlux app -- there's no reactive equivalent here yet.
+This starter is built on a servlet `Filter` and a `HandlerExceptionResolver` -- both Spring MVC (servlet-stack) concepts. It auto-detects a servlet web application (`@ConditionalOnWebApplication(type = SERVLET)`) and won't register the filter or resolver otherwise, and it won't do anything useful in a WebFlux app.
 
-The reason isn't just "not built yet": the underlying `OlusoClient.runInScope` is backed by a `ThreadLocal`, which is correct for the servlet stack's one-thread-per-request model but breaks under WebFlux/Project Reactor, where a request's continuation can resume on a different thread than it started on. A WebFlux integration needs to thread state through Reactor's own `Context` instead, which is different enough in shape (a `WebFilter` and reactive exception handling, not a `Filter` and `HandlerExceptionResolver`) that it doesn't fit naturally into this same module -- it would be a separate one.
+That's not just a missing feature: the underlying `OlusoClient.runInScope` is backed by a `ThreadLocal`, which is correct for the servlet stack's one-thread-per-request model but breaks under WebFlux/Project Reactor, where a request's continuation can resume on a different thread than it started on. For a WebFlux application, use [`oluso-spring-boot-starter-webflux`](../spring-boot-starter-webflux) instead, which threads state through Reactor's own `Context` and is shaped differently as a result (a `WebFilter` and reactive exception handling, not a `Filter` and `HandlerExceptionResolver`) -- the two starters are independent; install whichever matches your app's stack, not both.
 
 ## License
 

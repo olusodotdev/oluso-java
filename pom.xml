@@ -36,6 +36,7 @@
     <modules>
         <module>core</module>
         <module>spring-boot-starter</module>
+        <module>spring-boot-starter-webflux</module>
     </modules>
 
     <properties>
