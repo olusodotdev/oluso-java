@@ -64,21 +64,37 @@ public final class Sanitizer {
         }
         if (value instanceof Map) {
             Map<String, Object> sanitized = new LinkedHashMap<>();
-            ((Map<String, Object>) value).forEach((key, val) -> {
+            int count = 0;
+            for (Map.Entry<String, Object> entry : ((Map<String, Object>) value).entrySet()) {
+                if (count++ >= 200) {
+                    sanitized.put("_truncated", true);
+                    break;
+                }
+                String key = entry.getKey();
+                Object val = entry.getValue();
                 if (isSensitiveKey(key)) {
                     sanitized.put(key, REDACTED);
                 } else {
                     sanitized.put(key, sanitizeValueAtDepth(val, depth - 1));
                 }
-            });
+            }
             return sanitized;
         }
         if (value instanceof List) {
             List<Object> sanitized = new ArrayList<>();
-            for (Object item : (List<Object>) value) {
+            List<Object> items = (List<Object>) value;
+            int limit = Math.min(items.size(), 100);
+            for (Object item : items.subList(0, limit)) {
                 sanitized.add(sanitizeValueAtDepth(item, depth - 1));
             }
+            if (items.size() > limit) {
+                sanitized.add("[" + (items.size() - limit) + " more items truncated]");
+            }
             return sanitized;
+        }
+        if (value instanceof CharSequence) {
+            String text = value.toString();
+            return text.length() <= 4000 ? text : text.substring(0, 4000) + "... [truncated]";
         }
         return value;
     }

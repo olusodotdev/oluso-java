@@ -11,8 +11,6 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -75,15 +73,7 @@ public class OlusoWebFilter implements WebFilter, Ordered {
                     }
                 })
                 .doOnError(throwable -> {
-                    String errorType = throwable.getClass().getSimpleName();
-                    String message = throwable.getMessage() != null ? throwable.getMessage() : errorType;
-                    client.capture(
-                            errorType,
-                            message,
-                            stackTraceOf(throwable),
-                            null,
-                            requestContextOf(exchange),
-                            holder.snapshot());
+                    client.captureException(throwable, requestContextOf(exchange), holder.snapshot());
                 })
                 .contextWrite(ctx -> ctx.put(OlusoReactiveContext.CONTEXT_KEY, holder));
     }
@@ -111,11 +101,5 @@ public class OlusoWebFilter implements WebFilter, Ordered {
                 .headers(headers)
                 .query(query)
                 .build();
-    }
-
-    private static String stackTraceOf(Throwable throwable) {
-        StringWriter writer = new StringWriter();
-        throwable.printStackTrace(new PrintWriter(writer));
-        return writer.toString();
     }
 }

@@ -1,8 +1,10 @@
 package dev.oluso;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class ErrorReport {
@@ -15,6 +17,9 @@ public final class ErrorReport {
     private final String fingerprint;
     private final ErrorContext context;
     private final long timestamp;
+    private final int schemaVersion;
+    private final Map<String, Object> exception;
+    private final Map<String, Object> sdk;
 
     ErrorReport(
             String title,
@@ -26,6 +31,15 @@ public final class ErrorReport {
             String fingerprint,
             ErrorContext context,
             long timestamp) {
+        this(title, message, stackTrace, environment, severity, tags, fingerprint, context,
+                timestamp, 2, null, null);
+    }
+
+    ErrorReport(
+            String title, String message, String stackTrace, String environment,
+            Severity severity, List<String> tags, String fingerprint, ErrorContext context,
+            long timestamp, int schemaVersion, Map<String, Object> exception,
+            Map<String, Object> sdk) {
         this.title = title;
         this.message = message;
         this.stackTrace = stackTrace;
@@ -35,6 +49,9 @@ public final class ErrorReport {
         this.fingerprint = fingerprint;
         this.context = context;
         this.timestamp = timestamp;
+        this.schemaVersion = schemaVersion;
+        this.exception = exception;
+        this.sdk = sdk;
     }
 
     public String getTitle() {
@@ -45,6 +62,7 @@ public final class ErrorReport {
         return message;
     }
 
+    @JsonProperty("stack_trace")
     public String getStackTrace() {
         return stackTrace;
     }
@@ -72,4 +90,11 @@ public final class ErrorReport {
     public long getTimestamp() {
         return timestamp;
     }
+
+    @JsonProperty("schema_version")
+    public int getSchemaVersion() { return schemaVersion; }
+
+    public Map<String, Object> getException() { return exception; }
+
+    public Map<String, Object> getSdk() { return sdk; }
 }

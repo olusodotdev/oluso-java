@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.lang.reflect.Method;
 
 /**
  * The Oluso client. Thread-safe and meant to be constructed once and shared
@@ -73,9 +74,26 @@ public final class OlusoClient {
 
     /** Same as {@link #captureException(Throwable)}, attaching the request it happened during. */
     public CompletableFuture<Void> captureException(Throwable throwable, RequestContext request) {
+        return captureException(throwable, request, null);
+    }
+
+    /**
+     * Captures the original throwable while using an externally managed request scope.
+     * Framework integrations should prefer this overload so exception causes and
+     * provider-specific attributes are not flattened into a message and stack string.
+     */
+    public CompletableFuture<Void> captureException(
+            Throwable throwable, RequestContext request, ScopeSnapshot scopeOverride) {
         String errorType = throwable.getClass().getSimpleName();
         String message = throwable.getMessage() != null ? throwable.getMessage() : errorType;
-        return capture(errorType, message, stackTraceOf(throwable), null, request);
+        return captureInternal(
+                errorType,
+                message,
+                stackTraceOf(throwable),
+                null,
+                request,
+                scopeOverride,
+                throwable);
     }
 
     public CompletableFuture<Void> captureMessage(String message, Severity severity) {
@@ -110,6 +128,17 @@ public final class OlusoClient {
             Severity severity,
             RequestContext request,
             ScopeSnapshot scopeOverride) {
+        return captureInternal(errorType, message, stackTrace, severity, request, scopeOverride, null);
+    }
+
+    private CompletableFuture<Void> captureInternal(
+            String errorType,
+            String message,
+            String stackTrace,
+            Severity severity,
+            RequestContext request,
+            ScopeSnapshot scopeOverride,
+            Throwable throwable) {
         if (options.getShouldReport() != null && !options.getShouldReport().test(message)) {
             return CompletableFuture.completedFuture(null);
         }
@@ -139,7 +168,10 @@ public final class OlusoClient {
                 options.getTags(),
                 fingerprint,
                 context,
-                System.currentTimeMillis());
+                System.currentTimeMillis(),
+                2,
+                buildExceptionDetails(errorType, message, stackTrace, throwable),
+                Map.of("name", "oluso-java", "version", "0.3.0", "language", "java"));
 
         return sendReport(report);
     }
@@ -228,5 +260,44 @@ public final class OlusoClient {
         StringWriter writer = new StringWriter();
         throwable.printStackTrace(new PrintWriter(writer));
         return writer.toString();
+    }
+
+    private Map<String, Object> buildExceptionDetails(
+            String errorType, String message, String stackTrace, Throwable throwable) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("type", errorType);
+        root.put("message", truncate(message, 4000));
+        if (stackTrace != null) root.put("stack_trace", truncate(stackTrace, 16000));
+        if (throwable != null) {
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            for (String methodName : List.of("getCode", "getStatusCode", "getRawStatusCode", "getResponseBodyAsString")) {
+                try {
+                    Method method = throwable.getClass().getMethod(methodName);
+                    if (method.getParameterCount() == 0) {
+                        attributes.put(methodName.substring(3), method.invoke(throwable));
+                    }
+                } catch (ReflectiveOperationException ignored) {
+                    // Optional provider-specific accessor is absent/inaccessible.
+                }
+            }
+            if (!attributes.isEmpty()) root.put("attributes", sanitizer.sanitizeValue(attributes));
+
+            List<Map<String, Object>> causes = new java.util.ArrayList<>();
+            Throwable cause = throwable.getCause();
+            for (int i = 0; cause != null && i < 5; i++, cause = cause.getCause()) {
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("type", cause.getClass().getName());
+                detail.put("message", truncate(String.valueOf(cause.getMessage()), 4000));
+                detail.put("stack_trace", truncate(stackTraceOf(cause), 16000));
+                causes.add(detail);
+            }
+            if (!causes.isEmpty()) root.put("causes", causes);
+        }
+        return root;
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) return value;
+        return value.substring(0, max) + "... [truncated]";
     }
 }
