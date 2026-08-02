@@ -105,7 +105,6 @@
                         <artifactId>maven-gpg-plugin</artifactId>
                         <version>3.2.7</version>
                         <configuration>
-                            <passphraseServerId>gpg.passphrase</passphraseServerId>
                             <gpgArguments>
                                 <arg>--pinentry-mode</arg>
                                 <arg>loopback</arg>
